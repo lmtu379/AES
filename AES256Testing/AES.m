@@ -195,18 +195,18 @@ int* cipher(int* input,int** w,int length) {
     for (int i=0; i<4*Nb; i++)
         state[i%4][(int)floor(i/4)] = input[i];
     
-    state = addRoundKey(state, w, 0, Nb);
+    addRoundKey(state, w, 0, Nb);
     
     for (int round=1; round<Nr; round++) {
-        state = subBytes(state, Nb);
-        state = shiftRows(state, Nb);
-        state = mixColumns(state, Nb);
-        state = addRoundKey(state, w, round, Nb);
+        subBytes(state, Nb);
+        shiftRows(state, Nb);
+        mixColumns(state, Nb);
+        addRoundKey(state, w, round, Nb);
     }
     
-    state = subBytes(state, Nb);
-    state = shiftRows(state, Nb);
-    state = addRoundKey(state, w, Nr, Nb);
+    subBytes(state, Nb);
+    shiftRows(state, Nb);
+    addRoundKey(state, w, Nr, Nb);
     
     int* output=(int *)malloc(sizeof(int)*(4*Nb)); //malloc((4*Nb)*sizeof(int));//var output = new Array(4*Nb);  // convert state to 1-d array before returning [§3.4]
     
