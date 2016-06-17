@@ -11,5 +11,5 @@
 @interface AES : NSObject
 
 +(NSString*)decrypt:(NSString*)cipherText withKey:(NSString*)key;
-
++(NSString*)decryptNew:(char*)ciphertext withKey:(char*)key withLength: (int) lenCipher;
 @end

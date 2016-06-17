@@ -291,7 +291,6 @@ int* cipher(int* input,int** w,int length) {
         NSString *ctItem = [ct objectAtIndex:b];
         int lenCt =(int)[ctItem length] + 1;
         buffSize+= lenCt;
-        
     }
     
     char* plaintext= (char *)malloc(sizeof(char)*(buffSize));
@@ -339,6 +338,141 @@ int* cipher(int* input,int** w,int length) {
     return result;
     
 }
+
+void subString(char* source,char* dest, int index, int size)
+{
+    dest =(char *)malloc(sizeof(char)*(size+ 1));
+    memcpy( dest, &source[index], size);
+    dest[index+size]= '\0';
+}
+
++(NSString*)decryptNew:(char*)ciphertext withKey:(char*)key withLength: (int) lenCipher{
+    
+    int nBits = 256;
+    
+    //struct timeval tv;
+    //gettimeofday(&tv,NULL);
+    
+   // NSData *decodedData = [[NSData alloc] initWithBase64EncodedString:cipherText options:0];
+   // NSString *ciphertext = [[NSString alloc] initWithData:decodedData encoding:NSISOLatin1StringEncoding];
+    
+    
+    size_t lenPass =strlen(key);
+    
+    int blockSize = 16;  // block size fixed at 16 bytes / 128 bits (Nb=4) for AES
+    if (!(nBits == 128 || nBits == 192 || nBits == 256))
+    {
+        //throw new Error('Key size is not 128 / 192 / 256');
+    }
+    
+    // use AES to encrypt password (mirroring encrypt routine)
+    int nBytes = nBits/8;  // no bytes in key
+    int* pwBytes= (int *)malloc(sizeof(int)*nBytes);
+    for (int i= 0; i < nBytes; i++) {
+        pwBytes[i] = i < lenPass ? (int)key[i] : 0;
+    }
+    int length = 60;
+    int** keyExpansionValue = keyExpansion(pwBytes);
+    int* keyCipher = cipher(pwBytes, keyExpansionValue, length);
+    
+    int* newKey= (int *)calloc(nBytes, sizeof(int));
+    for (int i= 0; i<16; i++) {
+        newKey[i] = keyCipher[i];
+    }
+    
+    for (int i= 0; i < (nBytes-16); i++) {
+        newKey[16 + i] = keyCipher[i];
+    }
+    
+    // recover nonce from 1st 8 bytes of ciphertext
+    int *counterBlock=(int *)malloc(sizeof(int)*16);
+    char* ctrTxt;
+    subString(ciphertext, ctrTxt, 0, 8);
+    //NSString* ctrTxt = [ciphertext substringWithRange:NSMakeRange(0, 8)];
+    
+    for (int i =0; i<8; i++) {
+        counterBlock[i] = (int) ctrTxt[i];
+    }
+    
+    // generate key schedule
+    int** keySchedule = keyExpansion(newKey);
+    
+    // separate ciphertext into blocks (skipping past initial 8 bytes)
+    float valueCeil =(float) (lenCipher-8) / blockSize;
+    int nBlocks = ceil(valueCeil);
+    
+    //NSMutableArray *ct =[[NSMutableArray alloc] initWithCapacity:nBlocks]; //new Array(nBlocks);
+     char **ct = (char **)malloc(nBlocks * sizeof(char *));
+    
+    for (int b = 0; b < nBlocks; b++)
+    {
+        int start = 8 + b * blockSize;
+        int end = 8 + b * blockSize + blockSize;
+        if (end >lenCipher)
+              subString(ciphertext, ct[b], start, lenCipher -start);
+           // [ct addObject:[ciphertext substringWithRange:NSMakeRange(start, lenCipher -start)]];
+        else
+             subString(ciphertext, ct[b], start, end - start);
+           // [ct addObject:[ciphertext substringWithRange:NSMakeRange(start, end - start)]];
+    }
+    
+    int buffSize= 0;
+    for (int b=0; b<nBlocks; b++) {
+        
+       // NSString *ctItem = [ct objectAtIndex:b];
+        size_t lenCt =strlen(ct[b]) + 1;
+        buffSize+= lenCt;
+    }
+    
+    char* plaintext= (char *)malloc(sizeof(char)*(buffSize));
+    strcpy(plaintext, "");
+    for (int b=0; b<nBlocks; b++) {
+        // set counter (block #) in last 8 bytes of counter block (leaving nonce in 1st 8 bytes)
+        for (int c=0; c<4; c++)
+            counterBlock[15-c] = ((b) >> c*8) & 0xff;
+        for (int c=0; c<4; c++)
+        {
+            //   counterBlock[15-c-4] = (((b+1)/0x100000000-1) >> c*8) & 0xff;
+            counterBlock[15-c-4] =0;
+        }
+        
+        int* cipherCntr = cipher(counterBlock, keySchedule, 60);  // encrypt counter block
+        
+       // NSString *ctItem = [ct objectAtIndex:b];
+        size_t lenCt =strlen(ct[b]);
+        if(b==nBlocks -1)
+            lenCt = lenCipher - 8 -( 16 * (nBlocks - 2));
+        
+        char* plaintxtByte= (char *)malloc(sizeof(char)*(lenCt + 1));
+        //int i=0;
+        for (int i=0; i<lenCt; i++) {
+            // -- xor plaintext with ciphered counter byte-by-byte --
+            int xorValue = cipherCntr[i] ^ (int) ct[b][i]; //(int) [ctItem characterAtIndex:i];
+            plaintxtByte[i] = (char) xorValue;
+        }
+        plaintxtByte[lenCt]= '\0';
+        
+        strcat(plaintext, plaintxtByte);
+        
+        free(plaintxtByte);
+        free(cipherCntr);
+        
+    }
+    
+    NSString *result= [NSString stringWithCString:plaintext encoding:NSUTF8StringEncoding];
+    
+    free(counterBlock);
+    free(keyExpansionValue);
+    free(keyCipher);
+    free(newKey);
+    
+    free(pwBytes);
+    free(plaintext);
+    
+    return result;
+    
+}
+
 
 
 @end
